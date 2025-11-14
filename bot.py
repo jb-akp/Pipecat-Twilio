@@ -80,14 +80,19 @@ async def handle_whatsapp_order_confirmation(params: FunctionCallParams):
     """
     try:
         order_summary = params.arguments.get("order_summary", "")
-        # Get the phone number passed by the LLM
+        # Get the phone number passed by the LLM (should already be normalized per prompt instructions)
         recipient_number = params.arguments.get("phone_number", "")
         to_number = f"whatsapp:{recipient_number}"  # Format for Twilio
         
         # Get Twilio credentials from environment
         account_sid = os.getenv("TWILIO_ACCOUNT_SID")
         auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-        from_number = os.getenv("TWILIO_WHATSAPP_NUMBER")  # Should be: whatsapp:+14155238886
+        from_number = os.getenv("TWILIO_WHATSAPP_NUMBER")  # Should be: +14155238886 (just the number, no whatsapp: prefix)
+        from_number = f"whatsapp:{from_number}"  # Add whatsapp: prefix for Twilio
+        
+        logger.info(f"📤 Preparing WhatsApp message:")
+        logger.info(f"   From: {from_number}")
+        logger.info(f"   To: {to_number}")
         
         # Initialize Twilio client
         client = Client(account_sid, auth_token)
@@ -148,7 +153,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                     },
                     "phone_number": {
                         "type": "string",
-                        "description": "The customer's phone number, including the country code (e.g., +15551234567). This is the number to send the WhatsApp confirmation to.",
+                        "description": "The customer's phone number, including the country code, formatted with only digits and a plus sign (e.g., +16507303690). No spaces, parentheses, or dashes. This is the number to send the WhatsApp confirmation to.",
                     }
                 },
                 "required": ["order_summary", "phone_number"],
@@ -175,11 +180,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                 "1. Greet the customer warmly\n"
                 "2. Ask what they would like to order\n"
                 "3. Collect all items, quantities, and any special instructions\n"
-                "4. Ask the customer for their phone number (including country code, e.g., +1...) for the WhatsApp confirmation\n"
-                "5. Repeat back the complete order AND the phone number to confirm\n"
-                "6. Ask if they're ready to confirm the order\n"
-                "7. When they confirm (say yes, confirm, sounds good, etc.), you MUST immediately call the 'send_whatsapp_message' function with the complete order summary AND the collected phone number\n"
-                "8. After the function is called, thank them and let them know the confirmation has been sent\n\n"
+                "4. Repeat back the complete order and ask them to confirm the order is correct (food and toppings only)\n"
+                "5. Once the order is confirmed, THEN ask for their phone number (including country code, e.g., +1...) for the WhatsApp confirmation\n"
+                "6. Repeat back the phone number and ask them to confirm the phone number is correct\n"
+                "7. Once both the order and phone number are confirmed, ask if they're ready to proceed with the WhatsApp confirmation\n"
+                "8. When they confirm they're ready to proceed (say yes, confirm, sounds good, etc.), you MUST immediately call the 'send_whatsapp_message' function with the complete order summary AND the collected phone number. IMPORTANT: Format the phone_number parameter with only digits and a plus sign (e.g., +16507303690), removing any spaces, parentheses, or dashes the user may have provided.\n"
+                "9. After the function is called, thank them and let them know the confirmation has been sent\n\n"
                 "Be conversational, friendly, and make sure you have all the details before confirming."
             ),
         },
