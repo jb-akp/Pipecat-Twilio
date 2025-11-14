@@ -7,13 +7,17 @@
    whatsapp_tool_definition = {
        "name": "send_whatsapp_message",
        "description": "...",
-       "parameters": {...}
+       "parameters": {
+           "order_summary": {"type": "string", ...},
+           "phone_number": {"type": "string", ...}  // ← Dynamic phone number!
+       },
+       "required": ["order_summary", "phone_number"]
    }
    ↓
    [Stored in Context]
 
 2. Handler Registered
-   llm.register_function("send_whatsapp_message", send_whatsapp_message)
+   llm.register_function("send_whatsapp_message", handle_whatsapp_order_confirmation)
    ↓
    [Stored in LLM Service: llm._functions = {"send_whatsapp_message": handler}]
 ```
@@ -39,13 +43,19 @@ Context (has tools) → LLM Service → OpenAI API
 
 ### Step 2: LLM Decides to Call Function
 
+During conversation, the LLM collects:
+- Order items (from user's spoken order)
+- Phone number (user provides during conversation)
+
+When user confirms, LLM calls the function:
+
 ```
 LLM Response: {
     "tool_calls": [{
         "id": "call_123",
         "function": {
             "name": "send_whatsapp_message",
-            "arguments": '{"order_summary": "1 pizza"}'
+            "arguments": '{"order_summary": "1 large pepperoni pizza, 2 cokes", "phone_number": "+15551234567"}'
         }
     }]
 }
@@ -70,12 +80,18 @@ If registered: Execute handler(params)
 ### Step 4: Execute Handler
 
 ```
-Registered Handler Found → send_whatsapp_message(params)
+Registered Handler Found → handle_whatsapp_order_confirmation(params)
     ↓
-Your Python code runs
+Extract arguments:
+  - order_summary = params.arguments.get("order_summary")
+  - phone_number = params.arguments.get("phone_number")  // ← Collected from conversation!
+    ↓
+Send WhatsApp message to phone_number
     ↓
 params.result_callback(result) → Result back to LLM
 ```
+
+**Key Point:** The LLM constructs both `order_summary` and `phone_number` from the conversation context. The phone number is collected dynamically during the conversation, not hardcoded!
 
 ## Why Both Are Essential
 
