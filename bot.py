@@ -4,10 +4,10 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Pipecat Order Taker Bot with WhatsApp Confirmation.
+"""Pipecat Personal Assistant Bot.
 
-The bot takes an order and uses OpenAI Function Calling to trigger a custom
-Python function that sends the final order confirmation via the Twilio WhatsApp API.
+A personal assistant that can check Google Calendar, check Gmail, and send reminders
+via WhatsApp using OpenAI Function Calling.
 
 Required AI services:
 - Deepgram (Speech-to-Text)
@@ -22,6 +22,8 @@ Required API keys:
 - TWILIO_AUTH_TOKEN
 - TWILIO_WHATSAPP_NUMBER
 - RECIPIENT_NUMBER
+- GOOGLE_CREDENTIALS_PATH (path to Google OAuth credentials JSON file)
+- GOOGLE_TOKEN_PATH (optional, defaults to token.json)
 
 Run the bot using::
 
@@ -32,7 +34,6 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
-from twilio.rest import Client
 
 print("🚀 Starting Pipecat bot...")
 print("⏳ Loading models and imports (20 seconds, first run only)\n")
@@ -58,7 +59,6 @@ from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
@@ -67,64 +67,8 @@ logger.info("✅ All components loaded successfully!")
 
 load_dotenv(override=True)
 
-
-# Custom WhatsApp function to send order confirmations
-async def handle_whatsapp_order_confirmation(params: FunctionCallParams):
-    """Send order confirmation via Twilio WhatsApp.
-    
-    Args:
-        params: FunctionCallParams containing the order_summary and phone_number in arguments
-        
-    Returns:
-        str: Confirmation message
-    """
-    try:
-        order_summary = params.arguments.get("order_summary", "")
-        # Get the phone number passed by the LLM (should already be normalized per prompt instructions)
-        recipient_number = params.arguments.get("phone_number", "")
-        to_number = f"whatsapp:{recipient_number}"  # Format for Twilio
-        
-        # Get Twilio credentials from environment
-        account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-        auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-        from_number = os.getenv("TWILIO_WHATSAPP_NUMBER")  # Should be: +14155238886 (just the number, no whatsapp: prefix)
-        from_number = f"whatsapp:{from_number}"  # Add whatsapp: prefix for Twilio
-        
-        logger.info(f"📤 Preparing WhatsApp message:")
-        logger.info(f"   From: {from_number}")
-        logger.info(f"   To: {to_number}")
-        
-        # Initialize Twilio client
-        client = Client(account_sid, auth_token)
-        
-        # Format the message
-        message_body = (
-            f"📦 Order Confirmed!\n\n"
-            f"Your order:\n{order_summary}\n\n"
-            f"Thank you for your order! We'll send you updates shortly."
-        )
-        
-        message = client.messages.create(
-            from_=from_number,
-            body=message_body,
-            to=to_number
-        )
-        
-        logger.info(f"✅ WhatsApp message sent successfully. SID: {message.sid}")
-        logger.info(f"   From: {from_number}")
-        logger.info(f"   To: {to_number}")
-        logger.info(f"   Message Status: {message.status}")
-        logger.info(f"   Full response: {message}")
-        
-        result = f"Order confirmation sent to WhatsApp number {recipient_number} successfully! Order: {order_summary}"
-        await params.result_callback(result)
-        return result
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to send WhatsApp message: {e}")
-        error_result = f"Error sending WhatsApp message: {str(e)}"
-        await params.result_callback(error_result)
-        return error_result
+# Import tool functions
+from tools import get_calendar_events, get_gmail_emails, send_whatsapp_reminder
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -134,29 +78,53 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        model_id="sonic-3", # <--- ADD THIS LINE
-        voice_id="f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Recommended Sonic 3 Voice: Katie (American Female)
+        model_id="sonic-3",  # Use the newest, highest-performing model
+        voice_id="f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Recommended Sonic 3 Voice: Katie
     )
 
-    # Define the WhatsApp function schema for the LLM
+    # Define the Calendar function schema for the LLM
+    calendar_tool_definition = {
+        "type": "function",
+        "function": {
+            "name": "get_calendar_events",
+            "description": "Get calendar events for TODAY. Use this when the user asks about their agenda, schedule, meetings, or what's on their calendar for today.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    }
+    
+    # Define the Gmail function schema for the LLM
+    gmail_tool_definition = {
+        "type": "function",
+        "function": {
+            "name": "get_gmail_emails",
+            "description": "Get the 3 most recent Gmail emails. Use this when the user asks about their emails, messages, or wants to check their inbox.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    }
+    
+    # Define the WhatsApp reminder function schema for the LLM
     whatsapp_tool_definition = {
         "type": "function",
         "function": {
-            "name": "send_whatsapp_message",
-            "description": "Send an order confirmation message to the customer via WhatsApp. Call this function when the user confirms their order and is ready to proceed.",
+            "name": "send_whatsapp_reminder",
+            "description": "Send a reminder message via WhatsApp. Use this when the user asks you to send them a text reminder, summary, or message with information they need to remember.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "order_summary": {
+                    "reminder_text": {
                         "type": "string",
-                        "description": "A detailed summary of the customer's complete order including all items, quantities, and any special instructions.",
-                    },
-                    "phone_number": {
-                        "type": "string",
-                        "description": "The customer's phone number, including the country code, formatted with only digits and a plus sign (e.g., +16507303690). No spaces, parentheses, or dashes. This is the number to send the WhatsApp confirmation to.",
+                        "description": "The text content of the reminder message to send. This should include all the important information the user wants to be reminded of (e.g., calendar events, tasks, notes).",
                     }
                 },
-                "required": ["order_summary", "phone_number"],
+                "required": ["reminder_text"],
             },
         },
     }
@@ -166,27 +134,27 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         api_key=os.getenv("OPENAI_API_KEY"),
     )
 
-    # Register the function handler
-    # Note: First parameter ("send_whatsapp_message") must match tool definition name
-    # Second parameter (handle_whatsapp_order_confirmation) can be any function name
-    llm.register_function("send_whatsapp_message", handle_whatsapp_order_confirmation)
+    # Register the function handlers
+    # Note: First parameter must match tool definition name
+    # Second parameter can be any function name
+    llm.register_function("get_calendar_events", get_calendar_events)
+    llm.register_function("get_gmail_emails", get_gmail_emails)
+    llm.register_function("send_whatsapp_reminder", send_whatsapp_reminder)
 
     messages = [
         {
             "role": "system",
             "content": (
-                "You are a friendly and efficient order taker for a restaurant or store. "
-                "Your job is to:\n"
-                "1. Greet the customer warmly\n"
-                "2. Ask what they would like to order\n"
-                "3. Collect all items, quantities, and any special instructions\n"
-                "4. Repeat back the complete order and ask them to confirm the order is correct (food and toppings only)\n"
-                "5. Once the order is confirmed, THEN ask for their phone number (including country code, e.g., +1...) for the WhatsApp confirmation\n"
-                "6. Repeat back the phone number and ask them to confirm the phone number is correct\n"
-                "7. Once both the order and phone number are confirmed, ask if they're ready to proceed with the WhatsApp confirmation\n"
-                "8. When they confirm they're ready to proceed (say yes, confirm, sounds good, etc.), you MUST immediately call the 'send_whatsapp_message' function with the complete order summary AND the collected phone number. IMPORTANT: Format the phone_number parameter with only digits and a plus sign (e.g., +16507303690), removing any spaces, parentheses, or dashes the user may have provided.\n"
-                "9. After the function is called, thank them and let them know the confirmation has been sent\n\n"
-                "Be conversational, friendly, and make sure you have all the details before confirming."
+                "You are a helpful and friendly personal assistant named James. "
+                "You help manage calendar, emails, and can send reminders via WhatsApp.\n\n"
+                "Your capabilities:\n"
+                "1. Check calendar events for TODAY using the 'get_calendar_events' function when asked about agenda, schedule, meetings, or what's on their calendar for today\n"
+                "2. Check Gmail emails using the 'get_gmail_emails' function when asked about emails, messages, or inbox. This returns the 3 most recent emails.\n"
+                "3. Send reminders via WhatsApp using the 'send_whatsapp_reminder' function when the user asks you to send them a text reminder or summary\n\n"
+                "Be conversational and natural. When the user asks about their agenda or calendar, use the calendar function. "
+                "When they ask about emails or messages, use the Gmail function. "
+                "When they ask you to send a reminder or text, gather the information they want included and use the WhatsApp function. "
+                "Keep responses concise and helpful."
             ),
         },
     ]
@@ -194,7 +162,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # Initialize the LLM context with tools (per docs, tools go in the context, not the LLM service)
     context = OpenAILLMContext(
         messages=messages,
-        tools=[whatsapp_tool_definition]
+        tools=[calendar_tool_definition, gmail_tool_definition, whatsapp_tool_definition]
     )
     
     # Create context aggregator using the LLM service method (per docs)
@@ -234,7 +202,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
         # Kick off the conversation.
-        messages.append({"role": "system", "content": "Greet the customer warmly and ask what they would like to order today."})
+        messages.append({"role": "system", "content": "Greet the user casually with: 'Hey there, you ready to start the day?'"})
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")

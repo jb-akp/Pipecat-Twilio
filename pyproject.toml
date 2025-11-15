@@ -7,6 +7,10 @@ dependencies = [
     "pipecat-ai[cartesia,daily,deepgram,fal,local-smart-turn-v3,openai,runner,silero,webrtc]",
     "pipecat-ai-cli",
     "twilio>=9.8.6",
+    "google-api-python-client>=2.187.0",
+    "google-auth-httplib2>=0.2.1",
+    "google-auth-oauthlib>=1.2.3",
+    "python-dateutil>=2.9.0.post0",
 ]
 
 [dependency-groups]
