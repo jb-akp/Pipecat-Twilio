@@ -69,21 +69,20 @@ async def get_calendar_events(params: FunctionCallParams):
         str: JSON string of events for today
     """
     try:
-        # Get today's date in local timezone
-        local_tz = datetime.now(timezone.utc).astimezone().tzinfo
-        today = datetime.now(local_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        # Get the start and end of TODAY in the current local timezone (required for the search filter)
+        now = datetime.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
         
-        logger.info(f"📅 Fetching calendar events for today: {today.strftime('%Y-%m-%d')}")
+        # Convert to UTC ISO format for Google Calendar API (required format)
+        time_min = today_start.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+        time_max = today_end.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
         
-        # Convert to UTC for Google Calendar API
-        start_of_day = today
-        end_of_day = today + timedelta(days=1) - timedelta(seconds=1)
-        time_min = start_of_day.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
-        time_max = end_of_day.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+        logger.info(f"📅 Fetching calendar events for today ({now.strftime('%Y-%m-%d')})")
         
         # Get authenticated calendar service
         creds = get_google_credentials()
-        service = build('calendar', 'v3', credentials=creds)
+        service = build('calendar', 'v3', credentials=creds)d
         
         # Fetch events from primary calendar
         events_result = service.events().list(
@@ -97,48 +96,33 @@ async def get_calendar_events(params: FunctionCallParams):
         
         events = events_result.get('items', [])
         
-        # Filter events to only include summary and simplified times
+        # Filter events to include only summary and simplified times (focusing on timed events)
         filtered_events = []
         for event in events:
-            summary = event.get('summary', 'No title')
-            
-            # Extract and format start time
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            if 'T' in start:
-                # Normalize 'Z' to '+00:00' for fromisoformat
-                start_normalized = start.replace('Z', '+00:00')
-                start_dt = datetime.fromisoformat(start_normalized)
-                # Convert to local time and format
-                if start_dt.tzinfo:
-                    start_dt = start_dt.astimezone()
+            # We skip events without a 'dateTime' as they are typically all-day events that don't fit the '12:00 PM meeting' structure of the demo.
+            start_time_str = event.get('start', {}).get('dateTime')
+            end_time_str = event.get('end', {}).get('dateTime')
+            summary = event.get('summary', 'Untitled Event')
+
+            if start_time_str and end_time_str:
+                # 1. Parse API string (removes 'Z' and converts to Python object)
+                start_dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00')).astimezone()
+                end_dt = datetime.fromisoformat(end_time_str.replace('Z', '+00:00')).astimezone()
+                
+                # 2. Format for LLM readability
                 start_time = start_dt.strftime("%I:%M %p")
-            else:
-                start_time = "All day"
-            
-            # Extract and format end time
-            end = event.get('end', {}).get('dateTime', event.get('end', {}).get('date', ''))
-            if end and 'T' in end:
-                # Normalize 'Z' to '+00:00' for fromisoformat
-                end_normalized = end.replace('Z', '+00:00')
-                end_dt = datetime.fromisoformat(end_normalized)
-                # Convert to local time and format
-                if end_dt.tzinfo:
-                    end_dt = end_dt.astimezone()
                 end_time = end_dt.strftime("%I:%M %p")
-            elif end:
-                end_time = "All day"
-            else:
-                end_time = None
-            
-            filtered_events.append({
-                'summary': summary,
-                'start_time': start_time,
-                'end_time': end_time
-            })
+
+                filtered_events.append({
+                    'summary': summary,
+                    'start_time': start_time,
+                    'end_time': end_time
+                })
         
         result = json.dumps(filtered_events, indent=2)
         
-        logger.info(f"✅ Calendar events retrieved: {len(events)} events")
+        # NOTE: events variable in logger will still show max 50 events, but filtered_events is the concise list.
+        logger.info(f"✅ Calendar events retrieved: {len(events)} events (Filtered to {len(filtered_events)} timed events)")
         await params.result_callback(result)
         return result
         
@@ -252,4 +236,3 @@ async def send_whatsapp_reminder(params: FunctionCallParams):
         error_result = f"Error sending WhatsApp reminder: {str(e)}"
         await params.result_callback(error_result)
         return error_result
-
