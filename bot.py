@@ -68,7 +68,7 @@ logger.info("✅ All components loaded successfully!")
 load_dotenv(override=True)
 
 # Import tool functions
-from tools import get_calendar_events, get_gmail_emails, send_whatsapp_reminder
+from functions import get_calendar_events, get_gmail_emails, send_whatsapp_reminder
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):

@@ -13,6 +13,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from loguru import logger
+from pipecat.frames.frames import TTSSpeakFrame
 from pipecat.services.llm_service import FunctionCallParams
 from twilio.rest import Client
 
@@ -69,6 +70,9 @@ async def get_calendar_events(params: FunctionCallParams):
         str: JSON string of events for today
     """
     try:
+        # Bot speaks immediately before checking schedule
+        await params.llm.push_frame(TTSSpeakFrame("Let me check your schedule"))
+        
         # Get the start and end of TODAY in the current local timezone (required for the search filter)
         now = datetime.now()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -82,7 +86,7 @@ async def get_calendar_events(params: FunctionCallParams):
         
         # Get authenticated calendar service
         creds = get_google_credentials()
-        service = build('calendar', 'v3', credentials=creds)d
+        service = build('calendar', 'v3', credentials=creds)
         
         # Fetch events from primary calendar
         events_result = service.events().list(
@@ -143,6 +147,9 @@ async def get_gmail_emails(params: FunctionCallParams):
         str: JSON string of 3 most recent emails
     """
     try:
+        # Bot speaks immediately before checking inbox
+        await params.llm.push_frame(TTSSpeakFrame("Let me check your inbox"))
+        
         logger.info(f"📧 Fetching 3 most recent Gmail emails")
         
         # Get authenticated Gmail service
@@ -164,13 +171,11 @@ async def get_gmail_emails(params: FunctionCallParams):
                 format='metadata'
             ).execute()
             
-            # Extract snippet (email summary)
-            snippet = message.get('snippet', '')
-            
-            # Extract subject and from from headers
-            headers = message['payload'].get('headers', [])
-            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No subject')
-            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown sender')
+            # Extract snippet, subject, and from
+            snippet = message['snippet']
+            headers = message['payload']['headers']
+            subject = next(h['value'] for h in headers if h['name'] == 'Subject')
+            sender = next(h['value'] for h in headers if h['name'] == 'From')
             
             emails_list.append({
                 'snippet': snippet,
