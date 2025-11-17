@@ -206,6 +206,9 @@ async def send_whatsapp_reminder(params: FunctionCallParams):
         str: Confirmation message
     """
     try:
+        # Bot speaks immediately before sending reminder
+        await params.llm.push_frame(TTSSpeakFrame("Sending that to your WhatsApp"))
+        
         reminder_text = params.arguments.get("reminder_text", "")
         
         # Get Twilio credentials from environment
