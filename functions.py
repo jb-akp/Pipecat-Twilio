@@ -25,7 +25,6 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly'
 ]
 
-
 def get_google_credentials():
     """Get authenticated Google credentials for Calendar and Gmail APIs.
     
