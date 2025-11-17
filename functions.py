@@ -137,19 +137,19 @@ async def get_calendar_events(params: FunctionCallParams):
 
 
 async def get_gmail_emails(params: FunctionCallParams):
-    """Get the 3 most recent Gmail emails.
+    """Get the 2 most recent Gmail emails.
     
     Args:
         params: FunctionCallParams (no arguments needed)
         
     Returns:
-        str: JSON string of 3 most recent emails
+        str: JSON string of 2 most recent emails
     """
     try:
         # Bot speaks immediately before checking inbox
         await params.llm.push_frame(TTSSpeakFrame("Let me check your inbox"))
         
-        logger.info(f"📧 Fetching 3 most recent Gmail emails")
+        logger.info(f"📧 Fetching 2 most recent Gmail emails")
         
         # Get authenticated Gmail service
         creds = get_google_credentials()
@@ -158,7 +158,7 @@ async def get_gmail_emails(params: FunctionCallParams):
         # Get message IDs (list() only returns IDs, not full emails)
         message_ids = service.users().messages().list(
             userId='me',
-            maxResults=3
+            maxResults=2
         ).execute().get('messages', [])
         
         # Extract snippet, subject, and from for each email

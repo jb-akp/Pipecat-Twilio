@@ -29,8 +29,6 @@ Run the bot using::
 
     uv run bot.py
 """
-
-import asyncio
 import os
 
 import aiohttp
@@ -130,7 +128,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             "type": "function",
             "function": {
                 "name": "get_gmail_emails",
-                "description": "Get the 3 most recent Gmail emails. Use this when the user asks about their emails, messages, or wants to check their inbox.",
+                "description": "Get the 2 most recent Gmail emails. Use this when the user asks about their emails, messages, or wants to check their inbox.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -178,7 +176,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                     "You help manage calendar, emails, and can send reminders via WhatsApp.\n\n"
                     "Your capabilities:\n"
                     "1. Check calendar events for TODAY using the 'get_calendar_events' function when asked about agenda, schedule, meetings, or what's on their calendar for today\n"
-                    "2. Check Gmail emails using the 'get_gmail_emails' function when asked about emails, messages, or inbox. This returns the 3 most recent emails.\n"
+                    "2. Check Gmail emails using the 'get_gmail_emails' function when asked about emails, messages, or inbox. This returns the 2 most recent emails.\n"
                     "3. Send reminders via WhatsApp using the 'send_whatsapp_reminder' function when the user asks you to send them a text reminder or summary\n\n"
                     "Be conversational and natural. When the user asks about their agenda or calendar, use the calendar function. "
                     "When they ask about emails or messages, use the Gmail function. "
