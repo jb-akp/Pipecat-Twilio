@@ -13,11 +13,14 @@ Required AI services:
 - Deepgram (Speech-to-Text)
 - OpenAI (LLM)
 - Cartesia (Text-to-Speech)
+- Tavus (Video Avatar)
 
 Required API keys:
 - DEEPGRAM_API_KEY
 - OPENAI_API_KEY
 - CARTESIA_API_KEY
+- TAVUS_API_KEY
+- TAVUS_REPLICA_ID
 - TWILIO_ACCOUNT_SID
 - TWILIO_AUTH_TOKEN
 - TWILIO_WHATSAPP_NUMBER
@@ -48,7 +51,6 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 logger.info("✅ Silero VAD model loaded")
 
 from pipecat.audio.vad.vad_analyzer import VADParams
-from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -252,7 +254,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
 
 async def bot(runner_args: RunnerArguments):
-    """Main bot entry point compatible with Pipecat Cloud."""
     transport = await create_transport(runner_args, transport_params)
     await run_bot(transport, runner_args)
 

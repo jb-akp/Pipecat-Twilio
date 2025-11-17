@@ -213,10 +213,10 @@ async def send_whatsapp_reminder(params: FunctionCallParams):
         # Get Twilio credentials from environment
         account_sid = os.getenv("TWILIO_ACCOUNT_SID")
         auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-        from_number = os.getenv("TWILIO_WHATSAPP_NUMBER")  # Should be: +14155238886 (just the number, no whatsapp: prefix)
+        from_number = os.getenv("TWILIO_WHATSAPP_NUMBER")  # Just the number, no whatsapp: prefix
         from_number = f"whatsapp:{from_number}"  # Add whatsapp: prefix for Twilio
         
-        recipient_number = os.getenv("RECIPIENT_NUMBER")  # Should be: +16507303690 (just the number)
+        recipient_number = os.getenv("RECIPIENT_NUMBER")  # Just the number
         to_number = f"whatsapp:{recipient_number}"  # Format for Twilio
         
         logger.info(f"📤 Preparing WhatsApp reminder:")
