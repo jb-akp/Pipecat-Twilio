@@ -184,9 +184,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                     "When they ask about emails or messages, use the Gmail function. "
                     "When they ask you to send a reminder or text, gather the information they want included and use the WhatsApp function. "
                     "Keep responses concise and helpful.\n\n"
+                    "When the user first greets you, respond with: 'Good morning! Are you ready to start the day?' This should be your first response after they greet you.\n\n"
                     "IMPORTANT: When responding about emails, be casual and human-like. Don't list emails formally with subjects. "
-                    "Instead, speak naturally like: 'yeah, you got one from brett malinowski talking about the livestream' or "
-                    "'paul wilkin gave you a lighthearted update about genai trends.' Use the snippet and subject to understand what each email is about, "
+                    "Instead, speak naturally like: 'yeah, you got one from a colleague talking about the livestream' or "
+                    "'someone gave you a lighthearted update about genai trends.' Use the snippet and subject to understand what each email is about, "
                     "then summarize it casually in your own words. Keep it conversational, not robotic."
                 ),
             },
