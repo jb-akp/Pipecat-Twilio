@@ -52,6 +52,7 @@ logger.info("✅ Silero VAD model loaded")
 
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
+
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -168,7 +169,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
         # Initialize the LLM context with tools (per docs, tools go in the context, not the LLM service)
         context = OpenAILLMContext(
-            messages=messages,
+            messages,
             tools=[calendar_tool_definition, gmail_tool_definition, whatsapp_tool_definition]
         )
         
