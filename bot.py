@@ -133,9 +133,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         }
 
         # Initialize the LLM
-        llm = OpenAILLMService(
-            api_key=os.getenv("OPENAI_API_KEY"),
-        )
+        llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
         # Register the function handlers
         # Note: First parameter must match tool definition name
@@ -186,9 +184,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
         # Configure STT mute filter to mute during function calls (prevents awkward silence)
-        stt_mute_filter = STTMuteFilter(
-            config=STTMuteConfig(strategies={STTMuteStrategy.FUNCTION_CALL})
-        )
+        stt_mute_filter = STTMuteFilter(config=STTMuteConfig(strategies={STTMuteStrategy.FUNCTION_CALL}))
 
         pipeline = Pipeline(
             [
