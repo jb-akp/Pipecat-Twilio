@@ -56,6 +56,12 @@ Navigate to the quickstart directory and set up your environment.
    uv sync
    ```
 
+4. Install additional dependencies for Google Calendar, Gmail, and WhatsApp integration:
+
+   ```bash
+   uv add twilio google-api-python-client google-auth google-auth-httplib2 google-auth-oauthlib
+   ```
+
 ### Run your bot locally
 
 ```bash
