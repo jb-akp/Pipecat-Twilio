@@ -43,8 +43,8 @@ logger.info("Loading pipeline components...")
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFilter, STTMuteStrategy
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
@@ -58,6 +58,8 @@ logger.info("✅ All components loaded successfully!")
 
 load_dotenv(override=True)
 
+from functions import get_calendar_events, get_gmail_emails
+
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info(f"Starting bot")
@@ -69,24 +71,66 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
     )
 
+# 1. Calendar Tool Schema
+    calendar_tool_definition = {
+        "type": "function",
+        "function": {
+            "name": "get_calendar_events",
+            "description": "Get calendar events for TODAY. Use this when the user asks about their agenda, schedule, meetings, or what's on their calendar for today.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    }
+
+    # 2. Gmail Tool Schema
+    gmail_tool_definition = {
+        "type": "function",
+        "function": {
+            "name": "get_gmail_emails",
+            "description": "Get the 2 most recent Gmail emails. Use this when the user asks about their emails, messages, or wants to check their inbox.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    }
+
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+
+    llm.register_function("get_calendar_events", calendar_tool_definition)
+    llm.register_function("get_gmail_emails", get_gmail_emails)
 
     messages = [
         {
             "role": "system",
-            "content": "You are a friendly AI assistant. Respond naturally and keep your answers conversational.",
+            "content": """You are a friendly AI assistant. Respond naturally and keep your answers conversational.
+Your primary goal is to manage the user's morning by checking their schedule and emails.
+Use the 'get_calendar_events' function when they ask about their schedule or meetings today.
+Use the 'get_gmail_emails' function when they ask about their inbox or messages. Keep responses conversational.""",
         },
     ]
 
-    context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+    context = OpenAILLMContext(
+        messages,
+        tools=[calendar_tool_definition, gmail_tool_definition]
+    )
+    context_aggregator = llm.create_context_aggregator(context)
 
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+
+    stt_mute_filter = STTMuteFilter(
+        config=STTMuteConfig(strategies={STTMuteStrategy.FUNCTION_CALL})
+    )
 
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
             rtvi,  # RTVI processor
+            stt_mute_filter,
             stt,
             context_aggregator.user(),  # User responses
             llm,  # LLM
