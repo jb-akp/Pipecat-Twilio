@@ -56,12 +56,6 @@ Navigate to the quickstart directory and set up your environment.
    uv sync
    ```
 
-   Or install dependencies manually:
-
-   ```bash
-   uv add "pipecat-ai[webrtc,daily,silero,deepgram,openai,cartesia,local-smart-turn-v3,runner]" pipecat-ai-cli "twilio>=9.8.6" "google-api-python-client>=2.187.0" "google-auth>=2.43.0" "google-auth-httplib2>=0.2.1" "google-auth-oauthlib>=1.2.2" python-dotenv loguru
-   ```
-
 ### Run your bot locally
 
 ```bash
